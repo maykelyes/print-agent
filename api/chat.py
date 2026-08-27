@@ -1,5 +1,5 @@
 from http.server import BaseHTTPRequestHandler
-import anthropic, os, json
+import anthropic, os, json, threading
 
 AGENT_ID = "agent_01GuTCe6YuYJjBm3QcebjoHR"
 ENV_ID = "env_01DtrvHsgenRLkMLJamvcxJm"
@@ -56,19 +56,31 @@ class handler(BaseHTTPRequestHandler):
             )
             has_text = False
             got_error = False
-            for event in client.beta.sessions.events.stream(session_id=sid):
-                if event.type == "agent.message":
-                    for block in event.content:
-                        if hasattr(block, "text"):
-                            sse({"type": "text", "text": block.text})
-                            has_text = True
-                elif event.type == "session.status_idle":
-                    break
-                elif event.type == "session.status_error":
-                    got_error = True
-                    break
-                else:
-                    sse({"type": "status", "event": event.type})
+            timed_out = threading.Event()
+            timer = threading.Timer(90, lambda: timed_out.set())
+            timer.start()
+            try:
+                for event in client.beta.sessions.events.stream(session_id=sid):
+                    if timed_out.is_set():
+                        got_error = True
+                        break
+                    timer.cancel()
+                    timer = threading.Timer(90, lambda: timed_out.set())
+                    timer.start()
+                    if event.type == "agent.message":
+                        for block in event.content:
+                            if hasattr(block, "text"):
+                                sse({"type": "text", "text": block.text})
+                                has_text = True
+                    elif event.type == "session.status_idle":
+                        break
+                    elif event.type == "session.status_error":
+                        got_error = True
+                        break
+                    else:
+                        sse({"type": "status", "event": event.type})
+            finally:
+                timer.cancel()
             return has_text, got_error
 
         try:
