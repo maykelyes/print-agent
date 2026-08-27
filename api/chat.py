@@ -35,44 +35,63 @@ class handler(BaseHTTPRequestHandler):
             self.wfile.write(f"data: {json.dumps(data, ensure_ascii=False)}\n\n".encode())
             self.wfile.flush()
 
-        try:
-            if not session_id:
-                s = client.beta.sessions.create(
-                    agent=AGENT_ID,
-                    environment_id=ENV_ID,
-                    resources=[{
-                        "type": "memory_store",
-                        "memory_store_id": MEMORY_ID,
-                        "access": "read_write",
-                        "instructions": "בכל פעם שאתה לומד עובדה, מחיר או כלל חדש, עדכן את הקובץ המתאים.",
-                    }],
-                )
-                session_id = s.id
-
-            sse({"type": "session", "session_id": session_id})
-
-            client.beta.sessions.events.send(
-                session_id=session_id,
-                events=[{"type": "user.message", "content": [{"type": "text", "text": msg}]}],
+        def create_session():
+            s = client.beta.sessions.create(
+                agent=AGENT_ID,
+                environment_id=ENV_ID,
+                resources=[{
+                    "type": "memory_store",
+                    "memory_store_id": MEMORY_ID,
+                    "access": "read_write",
+                    "instructions": "בכל פעם שאתה לומד עובדה, מחיר או כלל חדש, עדכן את הקובץ המתאים.",
+                }],
             )
+            return s.id
 
+        def stream_session(sid, message):
+            """Send message and stream response. Returns (has_text, got_error)."""
+            client.beta.sessions.events.send(
+                session_id=sid,
+                events=[{"type": "user.message", "content": [{"type": "text", "text": message}]}],
+            )
             has_text = False
-            for event in client.beta.sessions.events.stream(session_id=session_id):
+            got_error = False
+            for event in client.beta.sessions.events.stream(session_id=sid):
                 if event.type == "agent.message":
                     for block in event.content:
                         if hasattr(block, "text"):
                             sse({"type": "text", "text": block.text})
                             has_text = True
-                elif event.type in ("session.status_idle", "session.status_error"):
+                elif event.type == "session.status_idle":
+                    break
+                elif event.type == "session.status_error":
+                    got_error = True
                     break
                 else:
-                    # Forward progress events so the connection stays alive
                     sse({"type": "status", "event": event.type})
+            return has_text, got_error
+
+        try:
+            if not session_id:
+                session_id = create_session()
+
+            sse({"type": "session", "session_id": session_id})
+
+            has_text, got_error = stream_session(session_id, msg)
+
+            # Session stuck or errored - create a new one and retry once
+            if got_error:
+                sse({"type": "status", "event": "session_recovery"})
+                session_id = create_session()
+                sse({"type": "session", "session_id": session_id})
+                has_text, got_error = stream_session(session_id, msg)
 
             if not has_text:
                 sse({"type": "text", "text": "לא התקבלה תשובה מהסוכן. נסה שוב."})
 
         except Exception as e:
+            # Connection or API error - tell frontend to reset session
             sse({"type": "error", "text": f"שגיאה: {str(e)}. נסה שוב או פתח שיחה חדשה."})
+            sse({"type": "session_reset"})
 
         sse({"type": "done"})

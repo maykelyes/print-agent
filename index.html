@@ -88,16 +88,22 @@ async function send(e) {
         if (!line.startsWith('data: ')) continue;
         try {
           const data = JSON.parse(line.slice(6));
-          if (data.type === 'session') {
-            sessionId = data.session_id;
-          } else if (data.type === 'text') {
+          if (data.type === 'text') {
             agentDiv.textContent += data.text;
             document.getElementById('loading').style.display = 'none';
           } else if (data.type === 'error') {
             agentDiv.textContent += data.text;
             document.getElementById('loading').style.display = 'none';
+          } else if (data.type === 'session_reset') {
+            sessionId = null;
+          } else if (data.type === 'session') {
+            sessionId = data.session_id;
           } else if (data.type === 'status') {
-            document.getElementById('loading').textContent = '⏳ הסוכן עובד...';
+            if (data.event === 'session_recovery') {
+              document.getElementById('loading').textContent = '🔄 מתאושש...';
+            } else {
+              document.getElementById('loading').textContent = '⏳ הסוכן עובד...';
+            }
           }
         } catch {}
       }
