@@ -101,6 +101,8 @@ async function send(e) {
           } else if (data.type === 'status') {
             if (data.event === 'session_recovery') {
               document.getElementById('loading').textContent = '🔄 מתאושש...';
+            } else if (data.elapsed) {
+              document.getElementById('loading').textContent = '⏳ הסוכן עובד... ' + data.elapsed + ' שניות';
             } else {
               document.getElementById('loading').textContent = '⏳ הסוכן עובד...';
             }

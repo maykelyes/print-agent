@@ -1,5 +1,5 @@
 from http.server import BaseHTTPRequestHandler
-import anthropic, os, json, threading
+import anthropic, os, json, time, httpx
 
 AGENT_ID = "agent_01GuTCe6YuYJjBm3QcebjoHR"
 ENV_ID = "env_01DtrvHsgenRLkMLJamvcxJm"
@@ -7,7 +7,7 @@ MEMORY_ID = "memstore_01MR2FvnrmX5rBbCtj3KdKxk"
 
 client = anthropic.Anthropic(
     api_key=os.environ.get("ANTHROPIC_API_KEY"),
-    timeout=120.0,
+    timeout=httpx.Timeout(connect=30, read=90, write=30, pool=30),
 )
 
 class handler(BaseHTTPRequestHandler):
@@ -56,31 +56,27 @@ class handler(BaseHTTPRequestHandler):
             )
             has_text = False
             got_error = False
-            timed_out = threading.Event()
-            timer = threading.Timer(90, lambda: timed_out.set())
-            timer.start()
-            try:
-                for event in client.beta.sessions.events.stream(session_id=sid):
-                    if timed_out.is_set():
-                        got_error = True
-                        break
-                    timer.cancel()
-                    timer = threading.Timer(90, lambda: timed_out.set())
-                    timer.start()
-                    if event.type == "agent.message":
-                        for block in event.content:
-                            if hasattr(block, "text"):
-                                sse({"type": "text", "text": block.text})
-                                has_text = True
-                    elif event.type == "session.status_idle":
-                        break
-                    elif event.type == "session.status_error":
-                        got_error = True
-                        break
-                    else:
-                        sse({"type": "status", "event": event.type})
-            finally:
-                timer.cancel()
+            start = time.time()
+            last_ping = start
+            for event in client.beta.sessions.events.stream(session_id=sid):
+                now = time.time()
+                # Send elapsed time every 10 seconds so UI shows progress
+                if now - last_ping >= 10:
+                    elapsed = int(now - start)
+                    sse({"type": "status", "event": event.type, "elapsed": elapsed})
+                    last_ping = now
+                if event.type == "agent.message":
+                    for block in event.content:
+                        if hasattr(block, "text"):
+                            sse({"type": "text", "text": block.text})
+                            has_text = True
+                elif event.type == "session.status_idle":
+                    break
+                elif event.type == "session.status_error":
+                    got_error = True
+                    break
+                else:
+                    sse({"type": "status", "event": event.type})
             return has_text, got_error
 
         try:
