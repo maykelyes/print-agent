@@ -1,5 +1,5 @@
 from http.server import BaseHTTPRequestHandler
-import anthropic, os, json, time, httpx
+import anthropic, os, json, time
 
 AGENT_ID = "agent_01GuTCe6YuYJjBm3QcebjoHR"
 ENV_ID = "env_01DtrvHsgenRLkMLJamvcxJm"
@@ -7,7 +7,7 @@ MEMORY_ID = "memstore_01MR2FvnrmX5rBbCtj3KdKxk"
 
 client = anthropic.Anthropic(
     api_key=os.environ.get("ANTHROPIC_API_KEY"),
-    timeout=httpx.Timeout(connect=30, read=90, write=30, pool=30),
+    timeout=120.0,
 )
 
 class handler(BaseHTTPRequestHandler):
