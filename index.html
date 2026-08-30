@@ -52,6 +52,12 @@ async function send(e) {
   input.value = '';
   addMsg(msg, 'user');
   document.getElementById('loading').style.display = 'block';
+  const loadEl = document.getElementById('loading');
+  let elapsed = 0;
+  const tick = setInterval(() => {
+    elapsed++;
+    loadEl.textContent = '⏳ הסוכן חושב... ' + elapsed + ' שניות';
+  }, 1000);
 
   const agentDiv = addMsg('', 'agent');
 
@@ -123,6 +129,7 @@ async function send(e) {
       agentDiv.textContent = agentDiv.textContent || 'שגיאה בתקשורת עם השרת. נסה שוב.';
     }
   } finally {
+    clearInterval(tick);
     document.getElementById('loading').style.display = 'none';
     document.getElementById('loading').textContent = '⏳ הסוכן חושב...';
   }
