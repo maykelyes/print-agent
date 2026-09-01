@@ -1,5 +1,5 @@
 from http.server import BaseHTTPRequestHandler
-import anthropic, os, json, time
+import anthropic, os, json, time, re
 
 AGENT_ID = "agent_01GuTCe6YuYJjBm3QcebjoHR"
 ENV_ID = "env_01DtrvHsgenRLkMLJamvcxJm"
@@ -43,10 +43,21 @@ class handler(BaseHTTPRequestHandler):
                     "type": "memory_store",
                     "memory_store_id": MEMORY_ID,
                     "access": "read_write",
-                    "instructions": "בכל פעם שאתה לומד עובדה, מחיר או כלל חדש, עדכן את הקובץ המתאים.",
+                    "instructions": "בכל פעם שאתה לומד עובדה, מחיר או כלל חדש, עדכן את הקובץ המתאים. חשוב: אל תציין למשתמש שאתה טוען או קורא מבסיס הידע. פשוט ענה ישירות על השאלה. כשהמשתמש נותן הערות או מידע לשמירה במאגר, שמור ואשר בקצרה בלבד - אל תתמחר מחדש אלא אם המשתמש ביקש זאת במפורש.",
                 }],
             )
             return s.id
+
+        # Filter out agent messages about loading/reading knowledge base
+        _KB_NOISE = re.compile(
+            r"(מאגר.?ידע|בסיס.?הידע|אקרא|אטען|טוען|קורא.*מאגר|knowledge.?base|loading|"
+            r"אבדוק.*מאגר|אחפש.*מאגר|נבדוק.*מאגר)",
+            re.IGNORECASE,
+        )
+
+        def _is_kb_noise(text):
+            """Return True if text is just the agent announcing it's reading memory."""
+            return bool(_KB_NOISE.search(text)) and len(text) < 200
 
         def stream_session(sid, message):
             """Send message and stream response. Returns (has_text, got_error)."""
@@ -58,16 +69,21 @@ class handler(BaseHTTPRequestHandler):
             got_error = False
             start = time.time()
             last_ping = start
+            # Send immediate thinking indicator
+            sse({"type": "status", "event": "thinking"})
             for event in client.beta.sessions.events.stream(session_id=sid):
                 now = time.time()
-                # Send elapsed time every 10 seconds so UI shows progress
-                if now - last_ping >= 10:
+                # Send elapsed time every 3 seconds so UI shows progress
+                if now - last_ping >= 3:
                     elapsed = int(now - start)
                     sse({"type": "status", "event": event.type, "elapsed": elapsed})
                     last_ping = now
                 if event.type == "agent.message":
                     for block in event.content:
                         if hasattr(block, "text"):
+                            # Skip noisy "loading knowledge base" messages
+                            if _is_kb_noise(block.text):
+                                continue
                             sse({"type": "text", "text": block.text})
                             has_text = True
                 elif event.type == "session.status_idle":
