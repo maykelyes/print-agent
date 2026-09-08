@@ -88,7 +88,7 @@ class handler(BaseHTTPRequestHandler):
                             has_text = True
                 elif event.type == "session.status_idle":
                     break
-                elif event.type == "session.status_error":
+                elif event.type in ("session.status_error", "session.error"):
                     got_error = True
                     break
                 else:
