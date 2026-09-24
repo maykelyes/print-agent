@@ -9,7 +9,11 @@
   body{background:#f5f5f5;display:flex;justify-content:center;padding:20px}
   .chat{width:100%;max-width:700px}
   h2{text-align:center;margin-bottom:15px}
-  #messages{background:white;border-radius:12px;padding:20px;height:70vh;overflow-y:auto;margin-bottom:10px}
+  .agent-switcher{display:flex;justify-content:center;gap:0;margin-bottom:12px;border-radius:10px;overflow:hidden;border:2px solid #007aff}
+  .agent-btn{flex:1;padding:10px 16px;border:none;background:white;color:#007aff;font-size:15px;font-weight:600;cursor:pointer;transition:all .2s}
+  .agent-btn.active{background:#007aff;color:white}
+  .agent-btn:hover:not(.active){background:#e8f0fe}
+  #messages{background:white;border-radius:12px;padding:20px;height:65vh;overflow-y:auto;margin-bottom:10px}
   .msg{margin:8px 0;padding:10px 14px;border-radius:10px;max-width:85%;white-space:pre-wrap;line-height:1.6}
   .user{background:#007aff;color:white;margin-left:auto}
   .agent{background:#e9e9eb}
@@ -21,7 +25,11 @@
 </head>
 <body>
 <div class="chat">
-  <h2>🖨️ סוכן תמחור דפוס</h2>
+  <h2 id="title">🖨️ סוכן תמחור דפוס</h2>
+  <div class="agent-switcher">
+    <button class="agent-btn active" onclick="switchAgent('general')" id="btn-general">🖨️ דפוס דיגיטלי</button>
+    <button class="agent-btn" onclick="switchAgent('offset')" id="btn-offset">⚙️ דפוס אופסט</button>
+  </div>
   <button onclick="newChat()" style="display:block;margin:0 auto 10px;padding:8px 20px;border-radius:8px;border:1px solid #ccc;background:white;color:#333;cursor:pointer;font-size:14px">🔄 שיחה חדשה</button>
   <div id="messages"></div>
   <div id="loading">⏳ הסוכן חושב...</div>
@@ -32,6 +40,23 @@
 </div>
 <script>
 let sessionId = null;
+let currentAgent = 'general';
+
+const agentTitles = {
+  general: '🖨️ סוכן דפוס דיגיטלי',
+  offset: '⚙️ סוכן דפוס אופסט'
+};
+
+function switchAgent(agent) {
+  if (agent === currentAgent) return;
+  currentAgent = agent;
+  sessionId = null;
+  document.getElementById('messages').innerHTML = '';
+  document.getElementById('title').textContent = agentTitles[agent];
+  document.querySelectorAll('.agent-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('btn-' + agent).classList.add('active');
+}
+
 function newChat(){
   sessionId=null;
   document.getElementById('messages').innerHTML='';
@@ -80,7 +105,7 @@ async function send(e) {
     const res = await fetch('/chat', {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({message: msg, session_id: sessionId}),
+      body: JSON.stringify({message: msg, session_id: sessionId, agent: currentAgent}),
       signal: controller.signal
     });
     clearTimeout(timeout);

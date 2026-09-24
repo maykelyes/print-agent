@@ -1,9 +1,19 @@
 from http.server import BaseHTTPRequestHandler
 import anthropic, os, json, time, re
 
-AGENT_ID = "agent_01GuTCe6YuYJjBm3QcebjoHR"
-ENV_ID = "env_01DtrvHsgenRLkMLJamvcxJm"
-MEMORY_ID = "memstore_01MR2FvnrmX5rBbCtj3KdKxk"
+# ---- Agent configurations ----
+AGENTS = {
+    "general": {
+        "agent_id": "agent_01GuTCe6YuYJjBm3QcebjoHR",
+        "env_id": "env_01DtrvHsgenRLkMLJamvcxJm",
+        "memory_id": "memstore_01MR2FvnrmX5rBbCtj3KdKxk",
+    },
+    "offset": {
+        "agent_id": "agent_01DhPUsezyLeHi9352vQprby",
+        "env_id": "env_01TyrC4zNpsNuFViqJNv5JUA",
+        "memory_id": "memstore_01MpBoa6pXXrzBiQ2eGVvmvF",
+    },
+}
 
 client = anthropic.Anthropic(
     api_key=os.environ.get("ANTHROPIC_API_KEY"),
@@ -23,6 +33,15 @@ class handler(BaseHTTPRequestHandler):
 
         msg = body["message"]
         session_id = body.get("session_id")
+        agent_key = body.get("agent", "general")
+        agent_cfg = AGENTS.get(agent_key, AGENTS["general"])
+
+        if not agent_cfg["agent_id"]:
+            self.send_response(400)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            self.wfile.write(json.dumps({"error": f"Agent '{agent_key}' is not configured"}).encode())
+            return
 
         # ---- SSE stream ----
         self.send_response(200)
@@ -36,15 +55,18 @@ class handler(BaseHTTPRequestHandler):
             self.wfile.flush()
 
         def create_session():
-            s = client.beta.sessions.create(
-                agent=AGENT_ID,
-                environment_id=ENV_ID,
-                resources=[{
+            resources = []
+            if agent_cfg["memory_id"]:
+                resources.append({
                     "type": "memory_store",
-                    "memory_store_id": MEMORY_ID,
+                    "memory_store_id": agent_cfg["memory_id"],
                     "access": "read_write",
                     "instructions": "בכל פעם שאתה לומד עובדה, מחיר או כלל חדש, עדכן את הקובץ המתאים. חשוב: אל תציין למשתמש שאתה טוען או קורא מבסיס הידע. פשוט ענה ישירות על השאלה. כשהמשתמש נותן הערות או מידע לשמירה במאגר, שמור ואשר בקצרה בלבד - אל תתמחר מחדש אלא אם המשתמש ביקש זאת במפורש.",
-                }],
+                })
+            s = client.beta.sessions.create(
+                agent=agent_cfg["agent_id"],
+                environment_id=agent_cfg["env_id"],
+                resources=resources,
             )
             return s.id
 
