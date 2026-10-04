@@ -17,7 +17,7 @@ AGENTS = {
 
 client = anthropic.Anthropic(
     api_key=os.environ.get("ANTHROPIC_API_KEY"),
-    timeout=120.0,
+    timeout=240.0,
 )
 
 class handler(BaseHTTPRequestHandler):
