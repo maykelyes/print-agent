@@ -1,0 +1,12 @@
+/* Print agents: clean chat UI */
+
+/* "+" menu next to the chat input (files, notes, integrations) - not used */
+#input-menu-button {
+	display: none !important;
+}
+
+/* Voice mode (live call) button - dictation via the microphone stays */
+button[aria-label='Voice mode'],
+button[aria-label='מצב קולי'] {
+	display: none !important;
+}
