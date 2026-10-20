@@ -1,0 +1,43 @@
+services:
+  open-webui:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+    restart: unless-stopped
+    volumes:
+      - /srv/openwebui/data:/app/backend/data
+    environment:
+      DATA_DIR: /app/backend/data
+      WEBUI_URL: https://${DOMAIN}
+      CORS_ALLOW_ORIGIN: https://${DOMAIN}
+      WEBUI_SECRET_KEY: ${WEBUI_SECRET_KEY}
+      ENABLE_SIGNUP: "False"
+      ENABLE_OLLAMA_API: "False"
+      ENABLE_OPENAI_API: "False"
+      ENABLE_TAGS_GENERATION: "False"
+      ENABLE_FOLLOW_UP_GENERATION: "False"
+      ENABLE_AUTOCOMPLETE_GENERATION: "False"
+      # Speech-to-text: Hebrew fine-tuned Whisper (ivrit.ai), forced to Hebrew
+      WHISPER_MODEL: ivrit-ai/whisper-large-v3-turbo-ct2
+      WHISPER_LANGUAGE: he
+    expose:
+      - "8080"
+
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    depends_on:
+      - open-webui
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      DOMAIN: ${DOMAIN}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
+volumes:
+  caddy_data:
+  caddy_config:
