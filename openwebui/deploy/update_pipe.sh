@@ -15,3 +15,4 @@ cur = db.execute("update function set content = ?, updated_at = ? where id = 'pr
 db.commit()
 print("pipe updated" if cur.rowcount == 1 else "ERROR: function 'print_agents' not found")
 EOF
+docker compose exec -T open-webui rm -f /tmp/print_agents_pipe.py
