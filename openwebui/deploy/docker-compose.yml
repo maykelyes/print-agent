@@ -17,8 +17,9 @@ services:
       ENABLE_TAGS_GENERATION: "False"
       ENABLE_FOLLOW_UP_GENERATION: "False"
       ENABLE_AUTOCOMPLETE_GENERATION: "False"
-      # Speech-to-text: Hebrew fine-tuned Whisper (ivrit.ai), forced to Hebrew
-      WHISPER_MODEL: ivrit-ai/whisper-large-v3-turbo-ct2
+      # Speech-to-text: Whisper "small", forced to Hebrew. Chosen over ivrit-ai/whisper-large-v3-turbo-ct2:
+      # ~5x faster on 2 vCPU (2.5s vs 12.8s for 8.6s of audio) and as accurate on a test recording.
+      WHISPER_MODEL: small
       WHISPER_LANGUAGE: he
     expose:
       - "8080"
